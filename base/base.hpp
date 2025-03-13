@@ -493,5 +493,31 @@ auto allocator(DynamicArray<T> const& a) { return a._allocator; }
 template<typename T> constexpr
 auto slice(DynamicArray<T> a) { return a[{0, a._length}]; }
 
+//// Array
+template<typename T, int N>
+struct Array {
+	T v[N];
+
+	T& operator[](isize idx){
+		bounds_check_assert(idx >= 0 && idx < N, "Index to slice is out of bounds");
+		return v[idx];
+	}
+
+	T const& operator[](isize idx) const {
+		bounds_check_assert(idx >= 0 && idx < N, "Index to slice is out of bounds");
+		return v[idx];
+	}
+
+	static_assert(N >= 0, "Array length must be greater than 0");
+};
+
+template<typename T, int N> constexpr
+isize len(Array<T, N> a){ return N; }
+
+#include "internal_array_overloads.gen.cpp"
+
 //// UTF-8
+Pair<Array<u8, 4>, i32> utf8_encode(rune r);
+
+Pair<rune, i32> utf8_decode(Slice<byte> s);
 
