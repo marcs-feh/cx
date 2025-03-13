@@ -134,11 +134,11 @@ struct Slice {
 	Slice(T* ptr, isize len) : _data{ptr}, _length{len}{}
 };
 
-template<typename T>
-isize len(Slice<T> s){ return s._length; }
+template<typename T> constexpr
+auto len(Slice<T> const& s){ return s._length; }
 
-template<typename T>
-T* raw_data(Slice<T> s){ return s._data; }
+template<typename T> constexpr
+auto raw_data(Slice<T> const& s){ return s._data; }
 
 //// Defer
 namespace impl_defer {
@@ -258,9 +258,19 @@ T* make(Allocator a){
 }
 
 template<typename T>
-Slice<T> make(Allocator a, isize n){
+void destroy(T* ptr, Allocator a){
+	mem_free(a, ptr, sizeof(T));
+}
+
+template<typename T>
+Slice<T> make(isize n, Allocator a){
 	auto p = (T*)mem_alloc(a, sizeof(T) * n, alignof(T));
 	return Slice<T>(p, p ? n : 0);
+}
+
+template<typename T>
+void destroy(Slice<T> s, Allocator a){
+	mem_free(a, (void*)raw_data(s), sizeof(T) * len(s));
 }
 
 //// String
@@ -373,21 +383,25 @@ struct DynamicArray {
 	}
 };
 
-
 template<typename T>
-Result<DynamicArray<T>, AllocatorError> make_dynamic_array(Allocator Allocator, isize cap = dynamic_array_default_capacity){
-	auto data = make<T>(Allocator, cap);
+Result<DynamicArray<T>, AllocatorError> make_dynamic_array(Allocator allocator, isize cap = dynamic_array_default_capacity){
+	auto data = make<T>(cap, allocator);
 	if(len(data) == 0){
 		return {.error = AllocatorError::OutOfMemory};
 	}
 
 	DynamicArray<T> arr;
-	arr._allocator = Allocator;
+	arr._allocator = allocator;
 	arr._length    = 0;
 	arr._capacity  = cap;
 	arr._data      = raw_data(data);
 
 	return {.value = arr};
+}
+
+template<typename T>
+void destroy(DynamicArray<T> arr){
+	mem_free(arr->_allocator, arr->_data, sizeof(T) * arr->_capacity);
 }
 
 template<typename T>
@@ -404,11 +418,12 @@ void destroy(DynamicArray<T>* arr){
 template<typename T>
 bool append(DynamicArray<T>* arr, T elem){
 	if(arr->_length >= arr->_capacity){
-		isize new_cap = mem_align_forward_size(arr->_length * 2, 16);
+		isize new_cap = max(arr->_length * 2, dynamic_array_default_capacity);
 		auto new_data = mem_realloc(arr->_allocator, arr->_data, arr->_capacity * sizeof(T), new_cap, alignof(T));
 		if(!new_data){
 			return false;
 		}
+		arr->_capacity = new_cap;
 		arr->_data = (T*)new_data;
 	}
 	arr->_data[arr->_length] = elem;
@@ -416,72 +431,67 @@ bool append(DynamicArray<T>* arr, T elem){
 	return true;
 }
 
-// bool pop(){
-// 	if(_length <= 0){ return false; }
-// 	_length -= 1;
-// 	auto v = _data[_length];
-// 	return v;
-// }
-//
-// bool insert(isize idx, T elem){
-// 	bounds_check_assert(idx >= 0 && idx <= _length, "Out of bounds index to insert_swap");
-// 	if(idx == _length){ return append(this, elem); }
-//
-// 	bool ok = append(this, elem);
-// 	if(!ok){ return false; }
-//
-// 	isize nbytes = sizeof(T) * (_length - 1 - idx);
-// 	mem_copy(&_data[idx + 1], &_data[idx], nbytes);
-// 	_data[idx] = elem;
-// 	return true;
-// }
-//
-// bool insert_swap(isize idx, T elem){
-// 	bounds_check_assert(idx >= 0 && idx <= _length, "Out of bounds index to insert_swap");
-// 	if(idx == _length){ return append(this, elem); }
-//
-// 	bool ok = append(this, _data[idx]);
-// 	[[unlikely]] if(!ok){ return false; }
-// 	_data[idx] = elem;
-//
-// 	return true;
-// }
-//
-// void remove_swap(isize idx){
-// 	bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds index to remove_swap");
-// 	T last = _data[_length - 1];
-// 	_data[idx] = last;
-// 	_length -= 1;
-// }
-//
-// void remove(isize idx){
-// 	bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds index to remove");
-// 	isize nbytes = sizeof(T) * (_length - idx + 1);
-// 	mem_copy(&_data[idx], &_data[idx+1], nbytes);
-// 	_length -= 1;
-// }
-//
-// static Pair<DynamicArray<T>, MemoryError> make(Allocator alloc, isize initial_cap = 16){
-// 	DynamicArray<T> arr;
-// 	arr._capacity = initial_cap;
-// 	arr._length = 0;
-// 	arr._allocator = alloc;
-//
-// 	auto [buffer, error] = alloc.alloc(initial_cap * sizeof(T), alignof(T));
-// 	if(!ok(error)){
-// 		return {arr, error};
-// 	}
-// 	arr._data = (T*)buffer;
-//
-// 	return {arr, MemoryError::None};
-// }
-//
-// // Accessors
-// isize len() const { return _length; }
-// isize cap() const { return _capacity; }
-// T* raw_data() const { return _data; }
-// Allocator allocator() const { return _allocator; }
+template<typename T>
+bool pop(DynamicArray<T>* arr){
+	if(arr->_length < 1){ return false; }
+	arr->_length -= 1;
+	auto v = arr->_data[arr->_length];
+	return v;
+}
 
+template<typename T>
+bool insert(DynamicArray<T>* arr, isize idx, T elem){
+	bounds_check_assert(idx >= 0 && idx <= arr->_length, "Out of bounds index to insert_swap");
+	if(idx == arr->_length){ return append(arr, elem); }
+
+	bool ok = append(arr, elem);
+	if(!ok){ return false; }
+
+	isize nbytes = sizeof(T) * (arr->_length - 1 - idx);
+	mem_copy(&arr->_data[idx + 1], &arr->_data[idx], nbytes);
+	arr->_data[idx] = elem;
+	return true;
+}
+
+template<typename T>
+void remove(DynamicArray<T>* arr, isize idx){
+	bounds_check_assert(idx >= 0 && idx < arr->_length, "Out of bounds index to remove");
+	isize nbytes = sizeof(T) * (arr->_length - idx + 1);
+	mem_copy(&arr->_data[idx], &arr->_data[idx+1], nbytes);
+	arr->_length -= 1;
+}
+
+template<typename T>
+bool insert_swap(DynamicArray<T>* arr, isize idx, T elem){
+	bounds_check_assert(idx >= 0 && idx <= arr->_length, "Out of bounds index to insert_swap");
+	if(idx == arr->_length){ return append(arr, elem); }
+
+	bool ok = append(arr, arr->_data[idx]);
+	[[unlikely]] if(!ok){ return false; }
+	arr->_data[idx] = elem;
+
+	return true;
+}
+
+template<typename T>
+void remove_swap(DynamicArray<T>* arr, isize idx){
+	bounds_check_assert(idx >= 0 && idx < arr->_length, "Out of bounds index to remove_swap");
+	T last = arr->_data[arr->_length - 1];
+	arr->_data[idx] = last;
+	arr->_length -= 1;
+}
+
+template<typename T> constexpr
+auto len(DynamicArray<T> const& a) { return a._length; }
+
+template<typename T> constexpr
+auto cap(DynamicArray<T> const& a) { return a._capacity; }
+
+template<typename T> constexpr
+auto allocator(DynamicArray<T> const& a) { return a._allocator; }
+
+template<typename T> constexpr
+auto slice(DynamicArray<T> a) { return a[{0, a._length}]; }
 
 //// UTF-8
 

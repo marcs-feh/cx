@@ -1,9 +1,6 @@
 #include "base/base.hpp"
 #include <iostream>
 
-constexpr isize mem_size = mem_KiB * 16;
-static byte memory[mem_size];
-
 template<typename T>
 std::ostream& operator<<(std::ostream& os, Slice<T> s){
 	std::cout << "[ ";
@@ -11,6 +8,7 @@ std::ostream& operator<<(std::ostream& os, Slice<T> s){
 		std::cout << s[i] << ' ';
 	}
 	std::cout << ']';
+	return os;
 }
 
 template<typename T>
@@ -34,17 +32,26 @@ void print(T x, Rest&& ... rest){
 	print(rest...);
 }
 
+constexpr isize mem_size = mem_KiB * 16;
+static byte memory[mem_size];
 
 int main(){
 	Arena arena = {0};
 	arena_init(&arena, Slice<byte>(memory, mem_size));
 	auto allocator = arena_allocator(&arena);
 
-	auto [arr, err] = make_dynamic_array<i32>(allocator);
+	auto [arr, err] = make_dynamic_array<i32>(allocator, 2);
 	print(arr);
 	append(&arr, 4);
 	append(&arr, 2);
 	append(&arr, 0);
+	append(&arr, 6);
+	append(&arr, 9);
+	print(arr);
+	remove(&arr, 1);
+	print(arr);
+	remove(&arr, 0);
+	insert(&arr, 2, 4);
 	print(arr);
 
 	String cu = "Sexooo";
