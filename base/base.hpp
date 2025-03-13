@@ -247,6 +247,8 @@ void mem_free_all(Allocator a);
 
 u32 mem_query(Allocator a);
 
+void* mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align);
+
 AllocatorError mem_last_error(Allocator a);
 
 template<typename T>
@@ -337,4 +339,149 @@ ArenaRegion arena_region_begin(Arena* a);
 void arena_region_end(ArenaRegion reg);
 
 Allocator arena_allocator(Arena* arena);
+
+//// Dynamic Array
+constexpr isize dynamic_array_default_capacity = 16;
+
+template<typename T>
+struct DynamicArray {
+	T*        _data;
+	isize     _capacity;
+	isize     _length;
+	Allocator _allocator;
+
+	T& operator[](isize idx){
+		bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds access to dynamic array");
+		return _data[idx];
+	}
+
+	T const& operator[](isize idx) const{
+		bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds access to dynamic array");
+		return _data[idx];
+	}
+
+	Slice<T> operator[](Pair<isize> range){
+		isize from = range.a;
+		isize to = range.b;
+
+		bounds_check_assert(from >= 0 && from < _length && to >= 0 && to <= _length && from <= to, "Index to sub-slice is out of bounds");
+
+		Slice<T> s;
+		s._length = to - from;
+		s._data = &_data[from];
+		return s;
+	}
+};
+
+
+template<typename T>
+Result<DynamicArray<T>, AllocatorError> make_dynamic_array(Allocator Allocator, isize cap = dynamic_array_default_capacity){
+	auto data = make<T>(Allocator, cap);
+	if(len(data) == 0){
+		return {.error = AllocatorError::OutOfMemory};
+	}
+
+	DynamicArray<T> arr;
+	arr._allocator = Allocator;
+	arr._length    = 0;
+	arr._capacity  = cap;
+	arr._data      = raw_data(data);
+
+	return {.value = arr};
+}
+
+template<typename T>
+void clear(DynamicArray<T>* arr){
+	arr->_length = 0;
+}
+
+template<typename T>
+void destroy(DynamicArray<T>* arr){
+	mem_free(arr->_allocator, arr->_data, arr->_capacity * sizeof(T));
+	arr->_capacity = 0;
+}
+
+template<typename T>
+bool append(DynamicArray<T>* arr, T elem){
+	if(arr->_length >= arr->_capacity){
+		isize new_cap = mem_align_forward_size(arr->_length * 2, 16);
+		auto new_data = mem_realloc(arr->_allocator, arr->_data, arr->_capacity * sizeof(T), new_cap, alignof(T));
+		if(!new_data){
+			return false;
+		}
+		arr->_data = (T*)new_data;
+	}
+	arr->_data[arr->_length] = elem;
+	arr->_length += 1;
+	return true;
+}
+
+// bool pop(){
+// 	if(_length <= 0){ return false; }
+// 	_length -= 1;
+// 	auto v = _data[_length];
+// 	return v;
+// }
+//
+// bool insert(isize idx, T elem){
+// 	bounds_check_assert(idx >= 0 && idx <= _length, "Out of bounds index to insert_swap");
+// 	if(idx == _length){ return append(this, elem); }
+//
+// 	bool ok = append(this, elem);
+// 	if(!ok){ return false; }
+//
+// 	isize nbytes = sizeof(T) * (_length - 1 - idx);
+// 	mem_copy(&_data[idx + 1], &_data[idx], nbytes);
+// 	_data[idx] = elem;
+// 	return true;
+// }
+//
+// bool insert_swap(isize idx, T elem){
+// 	bounds_check_assert(idx >= 0 && idx <= _length, "Out of bounds index to insert_swap");
+// 	if(idx == _length){ return append(this, elem); }
+//
+// 	bool ok = append(this, _data[idx]);
+// 	[[unlikely]] if(!ok){ return false; }
+// 	_data[idx] = elem;
+//
+// 	return true;
+// }
+//
+// void remove_swap(isize idx){
+// 	bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds index to remove_swap");
+// 	T last = _data[_length - 1];
+// 	_data[idx] = last;
+// 	_length -= 1;
+// }
+//
+// void remove(isize idx){
+// 	bounds_check_assert(idx >= 0 && idx < _length, "Out of bounds index to remove");
+// 	isize nbytes = sizeof(T) * (_length - idx + 1);
+// 	mem_copy(&_data[idx], &_data[idx+1], nbytes);
+// 	_length -= 1;
+// }
+//
+// static Pair<DynamicArray<T>, MemoryError> make(Allocator alloc, isize initial_cap = 16){
+// 	DynamicArray<T> arr;
+// 	arr._capacity = initial_cap;
+// 	arr._length = 0;
+// 	arr._allocator = alloc;
+//
+// 	auto [buffer, error] = alloc.alloc(initial_cap * sizeof(T), alignof(T));
+// 	if(!ok(error)){
+// 		return {arr, error};
+// 	}
+// 	arr._data = (T*)buffer;
+//
+// 	return {arr, MemoryError::None};
+// }
+//
+// // Accessors
+// isize len() const { return _length; }
+// isize cap() const { return _capacity; }
+// T* raw_data() const { return _data; }
+// Allocator allocator() const { return _allocator; }
+
+
+//// UTF-8
 

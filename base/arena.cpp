@@ -87,13 +87,14 @@ Result<void*, AllocatorError> arena_allocator_func (
 	using M = AllocatorMode;
 	using C = AllocatorCapability;
 
-	if(!mem_valid_alignment(align)){
-		result.error = AllocatorError::BadAlignment;
-		return result;
-	}
 
 	switch(mode){
 	case M::Alloc: {
+		if(!mem_valid_alignment(align)){
+			result.error = AllocatorError::BadAlignment;
+			return result;
+		}
+
 		result.value = arena_alloc(arena, size, align);
 		if(!result.value){
 			result.error = AllocatorError::OutOfMemory;

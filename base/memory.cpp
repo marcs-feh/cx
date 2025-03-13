@@ -24,6 +24,17 @@ void* mem_resize(Allocator a, void* ptr, isize old_size, isize new_size){
 	return a.func(a.data, AllocatorMode::Resize, new_size, 0, ptr, old_size).value;
 }
 
+void* mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align){
+	void* p = a.func(a.data, AllocatorMode::Resize, new_size, align, ptr, old_size).value;
+	if(!p){
+		p = mem_alloc(a, new_size, align);
+		if(p){
+			mem_free(a, ptr, old_size);
+		}
+	}
+	return p;
+}
+
 void mem_free(Allocator a, void* ptr, isize size){
 	a.func(a.data, AllocatorMode::Free, 0, 0, ptr, size);
 }
