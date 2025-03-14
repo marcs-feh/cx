@@ -290,6 +290,7 @@ struct String {
 	String() : _data{0}, _length{0} {}
 	String(const char* cs) : _data{(byte const*)cs}, _length{cstring_len(cs)}{}
 	explicit String(byte const* p, isize n) : _data{p}, _length{n}{}
+	explicit String(Slice<byte> s) : _data{raw_data(s)}, _length{len(s)}{}
 
 	byte operator[](isize idx){
 		bounds_check_assert(idx >= 0 && idx < _length, "Index to string is out of bounds");
@@ -517,7 +518,62 @@ isize len(Array<T, N> a){ return N; }
 #include "internal_array_overloads.gen.cpp"
 
 //// UTF-8
-Pair<Array<u8, 4>, i32> utf8_encode(rune r);
+struct UTF8DecodeResult {
+	rune codepoint;
+	i32 size;
+};
 
-Pair<rune, i32> utf8_decode(Slice<byte> s);
+struct UTF8EncodeResult {
+	Array<byte, 4> data;
+	i32 size;
+};
 
+struct UTF8Iterator {
+	Slice<byte> data;
+	isize current;
+};
+
+constexpr rune ERROR_RUNE = 0xfffd;
+
+constexpr UTF8EncodeResult ERROR_RUNE_UTF8 = {
+	.data = {0xef, 0xbf, 0xbd},
+	.size = 0,
+};
+
+UTF8EncodeResult utf8_encode(rune r);
+
+UTF8DecodeResult utf8_decode(Slice<byte> s);
+
+UTF8DecodeResult iter_next_pair(UTF8Iterator* it);
+
+UTF8DecodeResult iter_prev_pair(UTF8Iterator* it);
+
+rune iter_next(UTF8Iterator* it);
+
+rune iter_prev(UTF8Iterator* it);
+
+bool iter_done(UTF8Iterator it);
+
+//// Strings
+
+UTF8Iterator str_iterator(String s);
+
+UTF8Iterator str_iterator_reversed(String s) ;
+
+String str_clone(String s, Allocator a);
+
+String str_concat(String s0, String s1, Allocator a);
+
+isize str_rune_count(String s) ;
+
+bool str_starts_with(String s, String prefix);
+
+bool str_ends_with(String s, String suffix);
+
+String str_trim(String s, String cutset) ;
+
+String str_trim_leading(String s, String cutset) ;
+
+String str_trim_trailing(String s, String cutset) ;
+
+isize str_find(String s, String pattern, isize start);
