@@ -20,15 +20,12 @@ constexpr i32 SIZE4 = 0xf0; /* 1111_0xxx */
 
 constexpr i32 CONT = 0x80; /* 10xx_xxxx */
 
+
 static inline
 bool is_continuation_byte(rune c){
 	static const rune CONTINUATION1 = 0x80;
 	static const rune CONTINUATION2 = 0xbf;
 	return (c >= CONTINUATION1) && (c <= CONTINUATION2);
-}
-
-bool iter_done(UTF8Iterator it){
-	return it.current < 0 || it.current >= len(it.data);
 }
 
 UTF8EncodeResult utf8_encode(rune c){
@@ -66,14 +63,14 @@ UTF8EncodeResult utf8_encode(rune c){
 	return res;
 }
 
-constexpr UTF8DecodeResult DECODE_ERROR = { .codepoint = ERROR_RUNE, .size = 0 };
+constexpr UTF8DecodeResult DECODE_ERROR = { .codepoint = ERROR_RUNE, .size = 1 };
 
 UTF8DecodeResult utf8_decode(Slice<byte> s){
 	UTF8DecodeResult res = {};
 	byte* buf    = raw_data(s);
 	isize buflen = len(s);
 
-	if(buflen <= 0){ return DECODE_ERROR; }
+	if(buflen <= 0){ return {0, 0}; }
 
 	u8 first = buf[0];
 
@@ -120,39 +117,8 @@ UTF8DecodeResult utf8_decode(Slice<byte> s){
 	return res;
 }
 
-UTF8DecodeResult iter_next_pair(UTF8Iterator* it){
-	if(it->current >= len(it->data)){ return {0, 0}; }
-
-	UTF8DecodeResult res = utf8_decode(it->data[ {it->current, len(it->data)} ]);
-
-	if(res.codepoint == DECODE_ERROR.codepoint){
-		res.size = 1;
-	}
-
-	it->current += res.size;
+UTF8DecodeResult iter_advance(UTF8Iterator* it){
+	auto res = utf8_decode(it->data);
+	it->data = it->data[{ res.size, len(it->data) }];
 	return res;
 }
-
-UTF8DecodeResult iter_prev_pair(UTF8Iterator* it){
-	if(it->current <= 0){ return {0, 0}; }
-
-	it->current -= 1;
-	while(is_continuation_byte(it->data[it->current])){
-		it->current -= 1;
-	}
-
-	UTF8DecodeResult res = utf8_decode(it->data[ {it->current, len(it->data)} ]);
-
-	return res;
-}
-
-rune iter_next(UTF8Iterator* it){
-	auto res = iter_next_pair(it);
-	return res.codepoint;
-}
-
-rune iter_prev(UTF8Iterator* it){
-	auto res = iter_prev_pair(it);
-	return res.codepoint;
-}
-

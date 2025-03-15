@@ -122,7 +122,7 @@ struct Slice {
 		isize from = range.a;
 		isize to = range.b;
 
-		bounds_check_assert(from >= 0 && from < _length && to >= 0 && to <= _length && from <= to, "Index to sub-slice is out of bounds");
+		bounds_check_assert(from >= 0 && from <= _length && to >= 0 && to <= _length && from <= to, "Index to sub-slice is ill-formed");
 
 		Slice<T> s;
 		s._length = to - from;
@@ -272,55 +272,6 @@ template<typename T>
 void destroy(Slice<T> s, Allocator a){
 	mem_free(a, (void*)raw_data(s), sizeof(T) * len(s));
 }
-
-//// String
-static inline
-isize cstring_len(char const* cstr){
-	isize size = 0;
-	for(isize i = 0; cstr[i] != 0; i += 1){
-		size += 1;
-	}
-	return size;
-}
-
-struct String {
-	byte const* _data;
-	isize _length;
-
-	String() : _data{0}, _length{0} {}
-	String(const char* cs) : _data{(byte const*)cs}, _length{cstring_len(cs)}{}
-	explicit String(byte const* p, isize n) : _data{p}, _length{n}{}
-	explicit String(Slice<byte> s) : _data{raw_data(s)}, _length{len(s)}{}
-
-	byte operator[](isize idx){
-		bounds_check_assert(idx >= 0 && idx < _length, "Index to string is out of bounds");
-		return _data[idx];
-	}
-
-	String operator[](Pair<isize> range) const noexcept {
-		isize from = range.a;
-		isize to   = range.b;
-		bounds_check_assert(from >= 0 && from < _length && to >= 0 && to <= _length && from <= to, "Index to sub-string is out of bounds");
-
-		return String(&_data[from], to - from);
-	}
-
-	bool operator==(String lhs) const noexcept {
-		if(lhs._length != _length){ return false; }
-		return mem_compare(_data, lhs._data, _length) == 0;
-	}
-
-	bool operator!=(String lhs) const noexcept {
-		if(lhs._length != _length){ return false; }
-		return mem_compare(_data, lhs._data, _length) != 0;
-	}
-};
-
-static inline
-isize len(String s){ return s._length; }
-
-static inline
-byte const* raw_data(String s){ return s._data; }
 
 //// Arena
 struct Arena {
@@ -528,9 +479,21 @@ struct UTF8EncodeResult {
 	i32 size;
 };
 
+UTF8EncodeResult utf8_encode(rune r);
+
+UTF8DecodeResult utf8_decode(Slice<byte> s);
+
 struct UTF8Iterator {
 	Slice<byte> data;
-	isize current;
+
+	// WARNING: C++ Iterator insanity. C++ has some of the most shit
+	// iterator design in any programming language and it should not be
+	// taken seriously. This is *ONLY* to be able to iterate strings nicely.
+	void operator++();
+	rune operator*(){ return utf8_decode(this->data).codepoint; }
+	bool operator!=(UTF8Iterator const& it){ return raw_data(this->data) != raw_data(it.data); }
+	UTF8Iterator begin(){ return *this; }
+	UTF8Iterator end(){ return {data[{ len(data), len(data) }]}; }
 };
 
 constexpr rune ERROR_RUNE = 0xfffd;
@@ -540,40 +503,86 @@ constexpr UTF8EncodeResult ERROR_RUNE_UTF8 = {
 	.size = 0,
 };
 
-UTF8EncodeResult utf8_encode(rune r);
+UTF8DecodeResult iter_advance(UTF8Iterator* it);
 
-UTF8DecodeResult utf8_decode(Slice<byte> s);
-
-UTF8DecodeResult iter_next_pair(UTF8Iterator* it);
-
-UTF8DecodeResult iter_prev_pair(UTF8Iterator* it);
-
-rune iter_next(UTF8Iterator* it);
-
-rune iter_prev(UTF8Iterator* it);
-
-bool iter_done(UTF8Iterator it);
+inline void UTF8Iterator::operator++(){
+	iter_advance(this);
+}
 
 //// Strings
+static inline
+isize cstring_len(char const* cstr){
+	isize size = 0;
+	for(isize i = 0; cstr[i] != 0; i += 1){
+		size += 1;
+	}
+	return size;
+}
 
-UTF8Iterator str_iterator(String s);
+struct String {
+	byte const* _data;
+	isize _length;
 
-UTF8Iterator str_iterator_reversed(String s) ;
+	String() : _data{0}, _length{0} {}
+	String(const char* cs) : _data{(byte const*)cs}, _length{cstring_len(cs)}{}
+	explicit String(byte const* p, isize n) : _data{p}, _length{n}{}
+	explicit String(Slice<byte> s) : _data{raw_data(s)}, _length{len(s)}{}
 
-String str_clone(String s, Allocator a);
+	byte operator[](isize idx){
+		bounds_check_assert(idx >= 0 && idx < _length, "Index to string is out of bounds");
+		return _data[idx];
+	}
 
-String str_concat(String s0, String s1, Allocator a);
+	String operator[](Pair<isize> range) const noexcept {
+		isize from = range.a;
+		isize to   = range.b;
+		bounds_check_assert(from >= 0 && from < _length && to >= 0 && to <= _length && from <= to, "Index to sub-string is out of bounds");
 
-isize str_rune_count(String s) ;
+		return String(&_data[from], to - from);
+	}
 
-bool str_starts_with(String s, String prefix);
+	bool operator==(String lhs) const noexcept {
+		if(lhs._length != _length){ return false; }
+		return mem_compare(_data, lhs._data, _length) == 0;
+	}
 
-bool str_ends_with(String s, String suffix);
+	bool operator!=(String lhs) const noexcept {
+		if(lhs._length != _length){ return false; }
+		return mem_compare(_data, lhs._data, _length) != 0;
+	}
 
-String str_trim(String s, String cutset) ;
 
-String str_trim_leading(String s, String cutset) ;
+	// WARNING: C++ Iterator insanity. C++ has some of the most shit
+	// iterator design in any programming language and it should not be
+	// taken seriously. This is *ONLY* to be able to iterate strings nicely.
+	UTF8Iterator begin(){ return {Slice((byte*)_data, _length)}; }
+	UTF8Iterator end(){ return {Slice((byte*)_data + _length, 0)}; }
+};
 
-String str_trim_trailing(String s, String cutset) ;
+static inline
+isize len(String s){ return s._length; }
 
-isize str_find(String s, String pattern, isize start);
+static inline
+byte const* raw_data(String s){ return s._data; }
+
+// UTF8Iterator str_iterator(String s);
+//
+// UTF8Iterator str_iterator_reversed(String s) ;
+//
+// String str_clone(String s, Allocator a);
+//
+// String str_concat(String s0, String s1, Allocator a);
+//
+// isize str_rune_count(String s) ;
+//
+// bool str_starts_with(String s, String prefix);
+//
+// bool str_ends_with(String s, String suffix);
+//
+// String str_trim(String s, String cutset) ;
+//
+// String str_trim_leading(String s, String cutset) ;
+//
+// String str_trim_trailing(String s, String cutset) ;
+//
+// isize str_find(String s, String pattern, isize start);

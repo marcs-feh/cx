@@ -45,6 +45,12 @@ int main(){
 	arena_init(&arena, Slice<byte>(memory, mem_size));
 	auto allocator = arena_allocator(&arena);
 
-	String cu = "Sexooo";
-	print(str_trim_trailing(cu, "o"));
+	String cu = "S → exooλ";
+	for(rune c : cu){
+		auto enc = utf8_encode(c);
+		char buf[5] = {0};
+		mem_copy(buf, &enc.data, enc.size);
+		print(buf, c);
+	}
+	// print(str_trim_trailing(cu, "o"));
 }
