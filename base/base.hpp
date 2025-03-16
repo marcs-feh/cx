@@ -479,21 +479,45 @@ struct UTF8EncodeResult {
 	i32 size;
 };
 
+static inline
+bool utf8_is_continuation(rune c){
+	static const rune CONTINUATION1 = 0x80;
+	static const rune CONTINUATION2 = 0xbf;
+	return (c >= CONTINUATION1) && (c <= CONTINUATION2);
+}
+
+
 UTF8EncodeResult utf8_encode(rune r);
 
 UTF8DecodeResult utf8_decode(Slice<byte> s);
 
 struct UTF8Iterator {
 	Slice<byte> data;
+	isize current;
 
 	// WARNING: C++ Iterator insanity. C++ has some of the most shit
 	// iterator design in any programming language and it should not be
 	// taken seriously. This is *ONLY* to be able to iterate strings nicely.
-	void operator++();
-	rune operator*(){ return utf8_decode(this->data).codepoint; }
-	bool operator!=(UTF8Iterator const& it){ return raw_data(this->data) != raw_data(it.data); }
-	UTF8Iterator begin(){ return *this; }
-	UTF8Iterator end(){ return {data[{ len(data), len(data) }]}; }
+	void operator++(){
+		this->current += 1;
+		while(this->current < len(this->data) && utf8_is_continuation(this->data._data[this->current])){
+			this->current += 1;
+		}
+	}
+	void operator--(){
+		this->current -= 1;
+		while(this->current > 0 && utf8_is_continuation(this->data._data[this->current])){
+			this->current -= 1;
+		}
+	}
+	rune operator*(){
+		return utf8_decode(this->data[ {this->current, len(this->data)} ]).codepoint;
+	}
+	bool operator!=(UTF8Iterator const& it){
+		return &raw_data(this->data)[this->current] != &raw_data(it.data)[it.current];
+	}
+	UTF8Iterator begin(){ return {data, 0}; }
+	UTF8Iterator end(){ return {data, len(data)}; }
 };
 
 constexpr rune ERROR_RUNE = 0xfffd;
@@ -503,11 +527,11 @@ constexpr UTF8EncodeResult ERROR_RUNE_UTF8 = {
 	.size = 0,
 };
 
+bool iter_done(UTF8Iterator* it);
+
 UTF8DecodeResult iter_advance(UTF8Iterator* it);
 
-inline void UTF8Iterator::operator++(){
-	iter_advance(this);
-}
+UTF8DecodeResult iter_rewind(UTF8Iterator* it);
 
 //// Strings
 static inline
@@ -551,12 +575,10 @@ struct String {
 		return mem_compare(_data, lhs._data, _length) != 0;
 	}
 
+	// C++ Iterator bs
 
-	// WARNING: C++ Iterator insanity. C++ has some of the most shit
-	// iterator design in any programming language and it should not be
-	// taken seriously. This is *ONLY* to be able to iterate strings nicely.
-	UTF8Iterator begin(){ return {Slice((byte*)_data, _length)}; }
-	UTF8Iterator end(){ return {Slice((byte*)_data + _length, 0)}; }
+	UTF8Iterator begin(){ return {Slice((byte*)_data, _length), 0}; }
+	UTF8Iterator end(){ return {Slice((byte*)_data, _length), _length}; }
 };
 
 static inline
@@ -565,20 +587,16 @@ isize len(String s){ return s._length; }
 static inline
 byte const* raw_data(String s){ return s._data; }
 
-// UTF8Iterator str_iterator(String s);
-//
-// UTF8Iterator str_iterator_reversed(String s) ;
-//
-// String str_clone(String s, Allocator a);
-//
-// String str_concat(String s0, String s1, Allocator a);
-//
-// isize str_rune_count(String s) ;
-//
-// bool str_starts_with(String s, String prefix);
-//
-// bool str_ends_with(String s, String suffix);
-//
+String str_clone(String s, Allocator a);
+
+String str_concat(String s0, String s1, Allocator a);
+
+isize str_rune_count(String s);
+
+bool str_starts_with(String s, String prefix);
+
+bool str_ends_with(String s, String suffix);
+
 // String str_trim(String s, String cutset) ;
 //
 // String str_trim_leading(String s, String cutset) ;

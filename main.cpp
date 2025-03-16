@@ -46,11 +46,22 @@ int main(){
 	auto allocator = arena_allocator(&arena);
 
 	String cu = "S → exooλ";
-	for(rune c : cu){
+	UTF8Iterator it = {
+		.data = Slice((byte*)raw_data(cu), len(cu)),
+		.current = len(cu),
+	};
+	// UTF8DecodeResult res;
+
+	// for(auto it = cu.begin(); it != cu.end(); ++it){
+	for(auto it = cu.end() ;;){
+		auto [c, n] = iter_rewind(&it);
+		if(n == 0){ break; }
+
 		auto enc = utf8_encode(c);
 		char buf[5] = {0};
 		mem_copy(buf, &enc.data, enc.size);
 		print(buf, c);
 	}
+
 	// print(str_trim_trailing(cu, "o"));
 }

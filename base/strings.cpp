@@ -10,6 +10,14 @@ String str_clone(String s, Allocator a){
 	return String(buf[ {0, len(buf) - 1} ]);
 }
 
+isize str_rune_count(String s){
+	isize count = 0;
+	for(rune r : s){
+		count += 1;
+	}
+	return count;
+}
+
 [[nodiscard]]
 String str_concat(String s0, String s1, Allocator a){
 	auto buf = make<byte>(len(s0) + len(s1) + 1, a);
