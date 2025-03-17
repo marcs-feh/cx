@@ -10,7 +10,7 @@ ar='llvm-ar'
 
 case "$buildMode" in
 	'debug') cflags="$cflags -g -O0 -fsanitize=address" ;;
-	'release') cflags="$cflags -s -Os -static";
+	'release') cflags="$cflags -s -O3 -static";
 esac
 
 Run(){ echo "* $@"; $@; }
@@ -34,8 +34,4 @@ set -eu
 Run $cxx $cflags $iflags -o test.exe \
 	main.cpp base/base.cpp \
 	deps/mimalloc/mimalloc.a
-
-if [ "$buildMode" = "release" ]; then
-	Run strip test.exe
-fi
 
