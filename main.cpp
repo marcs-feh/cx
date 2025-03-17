@@ -5,7 +5,7 @@ constexpr isize mem_size = mem_KiB * 16;
 static byte memory[mem_size];
 
 int main(){
-	Arena arena = {0};
+	Arena arena{};
 	arena_init(&arena, Slice<byte>(memory, mem_size));
 	auto allocator = arena_allocator(&arena);
 

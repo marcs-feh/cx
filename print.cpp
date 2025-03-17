@@ -3,9 +3,6 @@
 
 #include <iostream>
 
-// constexpr static isize print_buffer_size = 16 * mem_KiB;
-// static byte print_buffer_memory[print_buffer_size];
-
 std::ostream& operator<<(std::ostream& os, String s){
 	os.write((char const*)raw_data(s), len(s));
 	return os;

@@ -5,16 +5,21 @@ buildMode="$1"
 
 cxx='clang++ -std=c++17'
 cflags='-Wall -Wextra -fPIC -fno-strict-aliasing'
-iflags='-I./deps/mimalloc/include'
+iflags='-I./base -I./deps/mimalloc/include'
 
+strip=''
 case "$buildMode" in
 	'debug') cflags="$cflags -g -O0" ;;
-	'release') cflags="$cflags -O3" ;;
+	'release') cflags="$cflags -O3"; strip='yes' ;;
 esac
 
-set -xeu
+Run(){ echo "* $@"; $@; }
 
-$cxx $cflags $iflags -o test.exe \
+set -eu
+
+Run $cxx $cflags $iflags -o test.exe \
 	main.cpp base/base.cpp \
-	deps/mimalloc/mimalloc.o
+	deps/mimalloc/mimalloc.a
+
+[ $strip ] && Run strip test.exe
 

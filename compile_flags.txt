@@ -1,0 +1,8 @@
+-std=c++17
+-Wall
+-Wextra
+-fPIC
+-fno-strict-aliasing
+-I./base
+-I./deps/mimalloc/include
+

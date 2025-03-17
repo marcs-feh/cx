@@ -162,20 +162,18 @@ namespace impl_defer {
 //// Memory
 enum struct AllocatorMode : u8 {
 	Alloc         = 0, // Allocate a chunk of memory (zero filled)
-	Resize        = 1, // Resize an allocation in-place (zero filled)
+	Realloc       = 1, // Resize an allocation (zero filled)
 	Free          = 2, // Mark allocation as free
 	FreeAll       = 3, // Mark all allocations as free
 	Query         = 4, // Query allocator's capabilities
-	LastError     = 5, // Get last error emmited by allocator
 };
 
 enum struct AllocatorCapability : u8 {
 	Alloc         = 1 << u8(AllocatorMode::Alloc),
-	Resize        = 1 << u8(AllocatorMode::Resize),
+	Realloc       = 1 << u8(AllocatorMode::Realloc),
 	Free          = 1 << u8(AllocatorMode::Free),
 	FreeAll       = 1 << u8(AllocatorMode::FreeAll),
 	/* Query      = Always Available */
-	/* LastError  = Always Available */
 };
 
 enum struct AllocatorError : u8 {
@@ -183,7 +181,8 @@ enum struct AllocatorError : u8 {
 	OutOfMemory  = 1,
 	BadAlignment = 2,
 	BadArgument  = 3,
-	UnknownMode  = 4,
+	NotSupported = 4,
+	UnknownMode  = 5,
 };
 
 constexpr isize mem_KiB = 1024ll;
@@ -237,23 +236,24 @@ struct Allocator {
 	AllocatorFunc  func;
 };
 
-void* mem_alloc(Allocator a, isize size, isize align);
+[[nodiscard]]
+Result<void*, AllocatorError> mem_alloc(Allocator a, isize size, isize align);
 
-void* mem_resize(Allocator a, void* ptr, isize old_size, isize new_size);
+[[nodiscard]]
+Result<void*, AllocatorError> mem_resize(Allocator a, void* ptr, isize old_size, isize new_size);
 
-void mem_free(Allocator a, void* ptr, isize size);
+AllocatorError mem_free(Allocator a, void* ptr, isize size, isize align);
 
-void mem_free_all(Allocator a);
+AllocatorError mem_free_all(Allocator a);
 
 u32 mem_query(Allocator a);
 
-void* mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align);
-
-AllocatorError mem_last_error(Allocator a);
+[[nodiscard]]
+Result<void*, AllocatorError> mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align);
 
 template<typename T>
 T* make(Allocator a){
-	auto p = (T*)mem_alloc(a, sizeof(T), alignof(T));
+	auto p = (T*)mem_alloc(a, sizeof(T), alignof(T)).value;
 	return p;
 }
 
@@ -264,7 +264,7 @@ void destroy(T* ptr, Allocator a){
 
 template<typename T>
 Slice<T> make(isize n, Allocator a){
-	auto p = (T*)mem_alloc(a, sizeof(T) * n, alignof(T));
+	auto p = (T*)mem_alloc(a, sizeof(T) * n, alignof(T)).value;
 	return Slice<T>(p, p ? n : 0);
 }
 
@@ -292,7 +292,7 @@ void arena_init(Arena* a, Slice<byte> buf);
 
 void* arena_alloc(Arena* arena, isize size, isize align);
 
-bool arena_resize(Arena* arena, void* ptr, isize size);
+bool arena_resize_in_place(Arena* arena, void* ptr, isize size);
 
 void arena_free_all(Arena* arena);
 
@@ -464,7 +464,7 @@ struct Array {
 };
 
 template<typename T, int N> constexpr
-isize len(Array<T, N> a){ return N; }
+isize len(Array<T, N>){ return N; }
 
 #include "internal_array_overloads.gen.cpp"
 

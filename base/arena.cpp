@@ -16,7 +16,7 @@ void* arena_alloc(Arena* a, isize size, isize align){
 
 	uintptr aligned  = mem_align_forward_ptr(current, align);
 	uintptr padding  = aligned - current;
-	uintptr required = padding + size;
+	isize required = padding + size;
 
 	if(required > available){
 		return nullptr; /* Out of memory */
@@ -30,7 +30,7 @@ void* arena_alloc(Arena* a, isize size, isize align){
 	return allocation;
 }
 
-bool arena_resize(Arena* a, void* ptr, isize size){
+bool arena_resize_in_place(Arena* a, void* ptr, isize size){
 	uintptr base    = (uintptr)a->data;
 	uintptr current = base + (uintptr)a->offset;
 	uintptr limit   = base + a->capacity;
@@ -76,8 +76,8 @@ void arena_region_end(ArenaRegion reg){
 Result<void*, AllocatorError> arena_allocator_func (
 	void* data,
 	AllocatorMode mode,
-	isize size,
-	isize align,
+	isize new_size,
+	isize new_align,
 	void* old_ptr,
 	isize old_size
 ){
@@ -90,38 +90,43 @@ Result<void*, AllocatorError> arena_allocator_func (
 
 	switch(mode){
 	case M::Alloc: {
-		if(!mem_valid_alignment(align)){
+		if(!mem_valid_alignment(new_align)){
 			result.error = AllocatorError::BadAlignment;
 			return result;
 		}
 
-		result.value = arena_alloc(arena, size, align);
+		result.value = arena_alloc(arena, new_size, new_align);
 		if(!result.value){
 			result.error = AllocatorError::OutOfMemory;
 		}
 	} break;
 
-	case M::Resize: {
-		if(arena_resize(arena, old_ptr, size)){
+	case M::Realloc: {
+		if(arena_resize_in_place(arena, old_ptr, new_size)){
 			result.value = old_ptr;
-		} else {
-			result.error = AllocatorError::OutOfMemory;
+		}
+		else {
+			result.value = arena_alloc(arena, new_size, new_align);
+			if(result.value){
+				mem_copy_no_overlap(result.value, old_ptr, old_size);
+			}
+			else {
+				result.error = AllocatorError::OutOfMemory;
+			}
 		}
 	} break;
 
-	case M::Free: /* Unsupported */ break;
+	case M::Free: {
+		result.error = AllocatorError::NotSupported;
+	} break;
 
 	case M::FreeAll: {
 		arena_free_all(arena);
 	} break;
 
 	case M::Query: {
-		u32 caps = u32(C::Alloc) | u32(C::FreeAll) | u32(C::Resize);
+		u32 caps = u32(C::Alloc) | u32(C::FreeAll) | u32(C::Realloc);
 		result.value = (void*)uintptr(caps);
-	} break;
-
-	case M::LastError: {
-		result.error = arena->last_error;
 	} break;
 
 	default: {

@@ -16,39 +16,24 @@ i32 mem_compare(void const * a, void const * b, isize count){
 	return __builtin_memcmp(a, b, count);
 }
 
-void* mem_alloc(Allocator a, isize size, isize align){
-	return a.func(a.data, AllocatorMode::Alloc, size, align, nullptr, 0).value;
+Result<void*, AllocatorError> mem_alloc(Allocator a, isize size, isize align){
+	return a.func(a.data, AllocatorMode::Alloc, size, align, nullptr, 0);
 }
 
-void* mem_resize(Allocator a, void* ptr, isize old_size, isize new_size){
-	return a.func(a.data, AllocatorMode::Resize, new_size, 0, ptr, old_size).value;
+Result<void*, AllocatorError> mem_resize(Allocator a, void* ptr, isize old_size, isize new_size){
+	return a.func(a.data, AllocatorMode::Realloc, new_size, 0, ptr, old_size);
 }
 
-void* mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align){
-	void* p = a.func(a.data, AllocatorMode::Resize, new_size, align, ptr, old_size).value;
-	if(!p){
-		p = mem_alloc(a, new_size, align);
-		if(p){
-			mem_free(a, ptr, old_size);
-		}
-	}
-	return p;
+AllocatorError mem_free(Allocator a, void* ptr, isize size){
+	return a.func(a.data, AllocatorMode::Free, 0, 0, ptr, size).error;
 }
 
-void mem_free(Allocator a, void* ptr, isize size){
-	a.func(a.data, AllocatorMode::Free, 0, 0, ptr, size);
-}
-
-void mem_free_all(Allocator a){
-	a.func(a.data, AllocatorMode::FreeAll, 0, 0, nullptr, 0);
+AllocatorError mem_free_all(Allocator a){
+	return a.func(a.data, AllocatorMode::FreeAll, 0, 0, nullptr, 0).error;
 }
 
 u32 mem_query(Allocator a){
 	auto val = uintptr(a.func(a.data, AllocatorMode::Query, 0, 0, nullptr, 0).value);
 	return u32(val);
-}
-
-AllocatorError mem_last_error(Allocator a){
-	return a.func(a.data, AllocatorMode::LastError, 0, 0, nullptr, 0).error;
 }
 
