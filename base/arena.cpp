@@ -9,6 +9,7 @@ void arena_init(Arena* a, Slice<byte> buf){
 }
 
 void* arena_alloc(Arena* a, isize size, isize align){
+	if(size == 0){ return nullptr; }
 	uintptr base = (uintptr)a->data;
 	uintptr current = base + (uintptr)a->offset;
 
@@ -79,7 +80,8 @@ Result<void*, AllocatorError> arena_allocator_func (
 	isize new_size,
 	isize new_align,
 	void* old_ptr,
-	isize old_size
+	isize old_size,
+	isize /* old_align */
 ){
 	auto arena = (Arena*)data;
 	Result<void*, AllocatorError> result{0};
@@ -102,7 +104,7 @@ Result<void*, AllocatorError> arena_allocator_func (
 	} break;
 
 	case M::Realloc: {
-		if(arena_resize_in_place(arena, old_ptr, new_size)){
+		if(old_ptr != nullptr && arena_resize_in_place(arena, old_ptr, new_size)){
 			result.value = old_ptr;
 		}
 		else {

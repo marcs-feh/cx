@@ -3,8 +3,6 @@
 #include "base.hpp"
 #include "mimalloc.h"
 
-// static thread_local auto mi_allocator_last_error = AllocatorError::None;
-//
 // Result<void*, AllocatorError> mi_heap_allocator_func(
 // 	void*,
 // 	AllocatorMode mode,

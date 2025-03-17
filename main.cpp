@@ -9,22 +9,13 @@ int main(){
 	arena_init(&arena, Slice<byte>(memory, mem_size));
 	auto allocator = arena_allocator(&arena);
 
-	String cu = "S → exooλ";
-	UTF8Iterator it = {
-		.data = Slice((byte*)raw_data(cu), len(cu)),
-		.current = len(cu),
-	};
-	// UTF8DecodeResult res;
-
-	// for(auto it = cu.begin(); it != cu.end(); ++it){
-	for(auto it = cu.end() ;;){
-		auto [c, n] = iter_rewind(&it);
-		if(n == 0){ break; }
-
-		auto enc = utf8_encode(c);
-		char buf[5] = {0};
-		mem_copy(buf, &enc.data, enc.size);
-		print(buf, c);
+	print("Arena:", arena.offset);
+	auto arr = make_dynamic_array<f32>(allocator, 0);
+	for(int i = 0; i < 20; i++){
+		append(&arr, f32(i));
+		print(arr);
+		print("Arena:", arena.offset);
 	}
 
+	return 0;
 }

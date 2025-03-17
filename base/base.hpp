@@ -228,7 +228,8 @@ using AllocatorFunc = Result<void*, AllocatorError>(*)(
 	isize size,
 	isize align,
 	void* old_ptr,
-	isize old_size
+	isize old_size,
+	isize old_align
 );
 
 struct Allocator {
@@ -240,16 +241,13 @@ struct Allocator {
 Result<void*, AllocatorError> mem_alloc(Allocator a, isize size, isize align);
 
 [[nodiscard]]
-Result<void*, AllocatorError> mem_resize(Allocator a, void* ptr, isize old_size, isize new_size);
+Result<void*, AllocatorError> mem_realloc(Allocator a, void* ptr, isize old_size, isize old_align, isize new_size, isize new_align);
 
 AllocatorError mem_free(Allocator a, void* ptr, isize size, isize align);
 
 AllocatorError mem_free_all(Allocator a);
 
 u32 mem_query(Allocator a);
-
-[[nodiscard]]
-Result<void*, AllocatorError> mem_realloc(Allocator a, void* ptr, isize old_size, isize new_size, isize align);
 
 template<typename T>
 T* make(Allocator a){
@@ -336,11 +334,8 @@ struct DynamicArray {
 };
 
 template<typename T>
-Result<DynamicArray<T>, AllocatorError> make_dynamic_array(Allocator allocator, isize cap = dynamic_array_default_capacity){
+DynamicArray<T> make_dynamic_array(Allocator allocator, isize cap = dynamic_array_default_capacity){
 	auto data = make<T>(cap, allocator);
-	if(len(data) == 0){
-		return {.error = AllocatorError::OutOfMemory};
-	}
 
 	DynamicArray<T> arr;
 	arr._allocator = allocator;
@@ -348,7 +343,7 @@ Result<DynamicArray<T>, AllocatorError> make_dynamic_array(Allocator allocator, 
 	arr._capacity  = cap;
 	arr._data      = raw_data(data);
 
-	return {.value = arr};
+	return arr;
 }
 
 template<typename T>
@@ -368,19 +363,19 @@ void destroy(DynamicArray<T>* arr){
 }
 
 template<typename T>
-bool append(DynamicArray<T>* arr, T elem){
+AllocatorError append(DynamicArray<T>* arr, T elem){
 	if(arr->_length >= arr->_capacity){
 		isize new_cap = max(arr->_length * 2, dynamic_array_default_capacity);
-		auto new_data = mem_realloc(arr->_allocator, arr->_data, arr->_capacity * sizeof(T), new_cap, alignof(T));
+		auto [new_data, err] = mem_realloc(arr->_allocator, arr->_data, arr->_capacity * sizeof(T), alignof(T), new_cap * sizeof(T), alignof(T));
 		if(!new_data){
-			return false;
+			return err;
 		}
 		arr->_capacity = new_cap;
 		arr->_data = (T*)new_data;
 	}
 	arr->_data[arr->_length] = elem;
 	arr->_length += 1;
-	return true;
+	return {};
 }
 
 template<typename T>
