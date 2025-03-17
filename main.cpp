@@ -27,9 +27,4 @@ int main(){
 		print(buf, c);
 	}
 
-	isize n = 300;
-	auto nums = make<f32>(n, heap_allocator());
-	defer(destroy(nums, heap_allocator()));
-
-	// print(str_trim_trailing(cu, "o"));
 }

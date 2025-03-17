@@ -605,6 +605,3 @@ bool str_ends_with(String s, String suffix);
 
 isize str_find(String s, String pattern, isize start);
 
-//// Heap allocator
-Allocator heap_allocator();
-
