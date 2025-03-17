@@ -5,4 +5,5 @@
 #include "arena.cpp"
 #include "utf8.cpp"
 #include "strings.cpp"
+#include "heap_allocator.cpp"
 

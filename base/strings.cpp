@@ -37,12 +37,30 @@ bool str_starts_with(String s, String prefix){
 	return cmp == 0;
 }
 
-
 bool str_ends_with(String s, String suffix){
 	if(len(suffix) == 0){ return true; }
 	if(len(suffix) > len(s)){ return false; }
 	i32 cmp = mem_compare(raw_data(s) + len(s) - len(suffix), raw_data(suffix), len(suffix));
 	return cmp == 0;
+}
+
+isize str_find(String s, String pattern, isize start){
+	bounds_check_assert(start < len(s), "Cannot begin searching after string length");
+	if(len(pattern) > len(s)){ return -1; }
+	else if(len(pattern) == 0){ return start; }
+
+	auto source_p  = raw_data(s);
+	auto pattern_p = raw_data(pattern);
+
+	auto length = len(s) - len(pattern);
+
+	for(isize i = start; i < length; i++){
+		if(mem_compare(&source_p[i], pattern_p, len(pattern)) == 0){
+			return i;
+		}
+	}
+
+	return -1;
 }
 
 // String str_trim(String s, String cutset) {
@@ -145,22 +163,4 @@ bool str_ends_with(String s, String suffix){
 //
 // 	return s[ {0, cut_until } ];
 // }
-//
-// isize str_find(String s, String pattern, isize start){
-// 	bounds_check_assert(start < len(s), "Cannot begin searching after string length");
-// 	if(len(pattern) > len(s)){ return -1; }
-// 	else if(len(pattern) == 0){ return start; }
-//
-// 	auto source_p  = raw_data(s);
-// 	auto pattern_p = raw_data(pattern);
-//
-// 	auto length = len(s) - len(pattern);
-//
-// 	for(isize i = start; i < length; i++){
-// 		if(mem_compare(&source_p[i], pattern_p, len(pattern)) == 0){
-// 			return i;
-// 		}
-// 	}
-//
-// 	return -1;
-// }
+

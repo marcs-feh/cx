@@ -602,5 +602,9 @@ bool str_ends_with(String s, String suffix);
 // String str_trim_leading(String s, String cutset) ;
 //
 // String str_trim_trailing(String s, String cutset) ;
-//
-// isize str_find(String s, String pattern, isize start);
+
+isize str_find(String s, String pattern, isize start);
+
+//// Heap allocator
+Allocator heap_allocator();
+
