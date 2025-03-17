@@ -4,13 +4,13 @@ buildMode="$1"
 [ -z "$buildMode" ] && buildMode='debug'
 
 cxx='clang++ -std=c++17'
-cflags='-Wall -Wextra -fPIC -fno-strict-aliasing'
+cflags='-Wall -Wextra -fPIC -fno-strict-aliasing -fno-exceptions -fno-asynchronous-unwind-tables'
 iflags='-I./base -I./deps/mimalloc/include'
 ar='llvm-ar'
 
 case "$buildMode" in
 	'debug') cflags="$cflags -g -O0 -fsanitize=address" ;;
-	'release') cflags="$cflags -O3";
+	'release') cflags="$cflags -s -Os -static";
 esac
 
 Run(){ echo "* $@"; $@; }
