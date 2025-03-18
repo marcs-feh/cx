@@ -89,7 +89,6 @@ Result<void*, AllocatorError> arena_allocator_func (
 	using M = AllocatorMode;
 	using C = AllocatorCapability;
 
-
 	switch(mode){
 	case M::Alloc: {
 		if(!mem_valid_alignment(new_align)){

@@ -348,7 +348,7 @@ DynamicArray<T> make_dynamic_array(Allocator allocator, isize cap = dynamic_arra
 
 template<typename T>
 void destroy(DynamicArray<T> arr){
-	mem_free(arr->_allocator, arr->_data, sizeof(T) * arr->_capacity);
+	mem_free(arr._allocator, arr._data, sizeof(T) * arr._capacity, alignof(T));
 }
 
 template<typename T>
@@ -599,4 +599,7 @@ bool str_ends_with(String s, String suffix);
 // String str_trim_trailing(String s, String cutset) ;
 
 isize str_find(String s, String pattern, isize start);
+
+//// Heap allocator (configurable)
+Allocator heap_allocator();
 
